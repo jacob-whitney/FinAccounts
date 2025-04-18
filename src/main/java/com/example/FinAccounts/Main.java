@@ -1,3 +1,4 @@
+package com.example.FinAccounts;
 /**
  * Advanced Database Development
  * April 23, 2025
@@ -8,11 +9,13 @@
  * @author Jacob Whitney
  */
 
+import java.sql.SQLException;
+
 /**
  * Main class managing all parts of the program
  */
 public class Main {
-    public static void main(String[] args) {
-        System.out.println("Hello, World!");
+    public static void main(String[] args) throws SQLException {
+        IPO.getProgramStart();
     }
 }

@@ -1,4 +1,4 @@
-/**
+package com.example.FinAccounts; /**
  * Advanced Database Development
  * April 23, 2025
  * AccountsTest.java
@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * Written unit tests for each function
  * in the program
  */
-public class AccountsTest {
+public class AccountsTests {
     private Account acc1 = new Account(
             1001,
             "Eating Out",
