@@ -9,6 +9,7 @@ package com.example.FinAccounts;
 // Imports
 import java.net.InetAddress;
 import java.sql.*;
+import java.util.ArrayList;
 import java.util.Scanner;
 
 /**
@@ -29,7 +30,7 @@ public class IPO {
     public static void getProgramStart() throws SQLException {
         System.out.println(printWelcome());
         connectNewDatabase();
-        /*System.out.print(printMainMenu());
+        System.out.print(printMainMenu());
         while (true) {
             if (getMainMenuSwitch()) {
                 System.out.print(printMainMenu());
@@ -37,9 +38,7 @@ public class IPO {
             } else {
                 break;
             }
-        }*/
-        setValuesInTable();
-        System.out.println(getValueFromTable());
+        }
     }
 
     /**
@@ -62,45 +61,18 @@ public class IPO {
     }
 
     /**
-     * Try method used for all database queries
-     * @param jbdcAddress Address that should be connected to
-     * @param query Query that should be attempted on database
-     * @return ResultSet
-     */
-    public static ResultSet tryDbQuery(String jbdcAddress, String query) {
-        try(Connection conn = DriverManager.getConnection(jbdcAddress, un, pw);
-            Statement stmt = conn.createStatement();
-            ResultSet rs = stmt.executeQuery(query);
-        ) {
-            stmt.executeUpdate(query);
-            return rs;
-        } catch (SQLException e) {
-            System.out.println("> Could not connect to database");
-            System.out.println("Exception caught: " + e);
-            return null;
-        }
-    }
-
-    /**
      * Instructions and user input to connect to
      * the user's database
      * @return boolean
      */
     public static boolean connectNewDatabase() {
         // Get database credentials from user
-        /*System.out.print("Enter your database server's IP address: ");
+        System.out.print("Enter your database server's IP address: ");
         ip = sc.nextLine();
         System.out.print("Enter your MySQL username: ");
         un = sc.nextLine();
         System.out.print("Enter your MySQL password: ");
-        pw = sc.nextLine();*/
-
-        // Temp shortcut
-        System.out.println("!** Temporarily skipping user entered creds **!\n");
-        ip = "172.24.161.23";
-        un = "jacobdb";
-        pw = "3U8#1:ysCT.q_!!tzSei";
-        // End temp shortcut
+        pw = sc.nextLine();
 
         // Connect to database using user inputs
         if (validateIpAddress(ip) && validateUsername(un)) {
@@ -146,27 +118,127 @@ public class IPO {
      * @param query String containing query to update database
      * @return result
      */
-    public static String queryDB(String query) {
+    public static ArrayList<String> queryDB(String query) {
         String jbdcAddress = "jdbc:mysql://" + ip + ":3306/" + db;
-        ResultSet rs = tryDbQuery(jbdcAddress, query);
-        StringBuilder result = new StringBuilder();
-        while(true) {
-            try {
-                assert rs != null;
-                if (!rs.next()) {
-                    break;
-                } else {
-                    result.append(rs.getInt("id")).append("\n");
-                    result.append(rs.getString("name")).append("\n");
-                    result.append(rs.getString("type")).append("\n");
-                    result.append(rs.getString("balance")).append("\n");
-                }
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
+        ArrayList<String> result = new ArrayList<>();
 
+        try(Connection conn = DriverManager.getConnection(jbdcAddress, un, pw);
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery(query);
+        ) {
+            while(rs.next()) {
+                result.add(rs.getString(1));
+            }
+        } catch (SQLException e) {
+            System.out.println("> Could not connect to database");
+            System.out.println("Exception caught: " + e);
         }
-        return result.toString(); // Likely to change to return results from query (string or other)
+
+        return result;
+    }
+
+    /**
+     * Get number of records in table
+     * @return integer
+     */
+    public static int getTableSize() {
+        ArrayList<String> result = queryDB("select count(*) from accounts");
+        return Integer.parseInt(result.get(0));
+    }
+
+    /**
+     * Process for creating account from user inputs
+     * @return boolean
+     */
+    public static boolean createAccount() {
+        String name = getValidName(inputValue("name"));
+        String type = getValidAcctType(inputValue("type"));
+        double balance = getValidBalance(inputValue("balance"));
+
+        String query = "INSERT INTO accounts (name, type, balance) " +
+                "VALUES ('" + name + "', '" + type + "', " + balance + ")";
+        return updateDB(query);
+    }
+
+    /**
+     * Return account records as a string
+     * @return String
+     */
+    public static String readAccountsTable() {
+        int tableSize = getTableSize();
+        StringBuilder acctRecords = new StringBuilder();
+
+        if (tableSize > 0) {
+            String query = "SELECT id FROM accounts";
+            ArrayList<String> ids = queryDB(query);
+            query = "Select name FROM accounts";
+            ArrayList<String> names = queryDB(query);
+            query = "Select type FROM accounts";
+            ArrayList<String> types = queryDB(query);
+            query = "Select balance FROM accounts";
+            ArrayList<String> balances = queryDB(query);
+
+            acctRecords.append(printAccHeadings());
+            for (int i = 0; i < tableSize; i++) {
+                acctRecords.append(
+                        ids.get(i) + " | " +
+                        names.get(i) + " | " +
+                        types.get(i) + " | " +
+                        balances.get(i) + "\n"
+                );
+            }
+        } else {
+            acctRecords.append("\s(Empty List)\n");
+        }
+
+        return acctRecords.toString();
+    }
+
+    /**
+     * Make changes to existing account record in database
+     * @return boolean
+     */
+    public static boolean updateAccount() {
+        System.out.println(readAccountsTable());
+        System.out.println("Enter the id of the account you would like to update.");
+        String id = String.valueOf(getValidId(inputValue("id")));
+        System.out.println("Which attribute would you like to update?");
+        String attribute = getValidAttribute(inputValue("attribute"));
+        System.out.println("What would you like to change the " + attribute + " to?");
+        String value = "";
+
+        switch (attribute) {
+            case "name":
+                value = getValidName(inputValue("name"));
+                break;
+            case "type":
+                value = getValidAcctType(inputValue("type"));
+                break;
+            case "balance":
+                value = String.valueOf(getValidBalance(inputValue("balance")));
+                break;
+            default:
+                System.out.println("> Account could not be updated, try again.");
+                return false;
+        }
+
+        String query = "UPDATE accounts SET " + attribute + " = '" + value + "' WHERE id = " + id + ";";
+        updateDB(query);
+        return true;
+    }
+
+    /**
+     * Delete account by id
+     * @return boolean
+     */
+    public static boolean deleteAccount() {
+        System.out.println(readAccountsTable());
+        System.out.println("Enter the id of the account you would like to delete.");
+        String id = String.valueOf(getValidId(inputValue("id")));
+
+        String query = "DELETE FROM accounts WHERE id = " + id + ";";
+        updateDB(query);
+        return true;
     }
 
     // Print Methods
@@ -233,8 +305,8 @@ public class IPO {
         String page = "\n\n" +
                 printHorizontalRule() +
                 "\s** FINANCIAL ACCOUNTS **\n" +
-                printHorizontalRule() +
-                printAccHeadings(); // Need to add query of values to be printed
+                printHorizontalRule() + "\n" +
+                readAccountsTable();
         return page;
     }
 
@@ -282,8 +354,7 @@ public class IPO {
      * @return headings
      */
     public static String printAccHeadings() {
-        String headings = printHorizontalRule() +
-                "ID    | Name           | Account Type  | Balance\n" +
+        String headings = "ID | Name       | Account Type | Balance\n" +
                 printHorizontalRule();
         return headings;
     }
@@ -295,16 +366,18 @@ public class IPO {
         switch (input) {
             case "c":
                 System.out.println(printCreatePage());
-                // Functions for Create Account menu and interactions
+                createAccount();
                 return true;
             case "p":
                 System.out.println(printReadPage());
                 return true;
             case "u":
                 System.out.println(printUpdatePage());
+                updateAccount();
                 return true;
             case "d":
                 System.out.println(printDeletePage());
+                deleteAccount();
                 return true;
             case "q":
                 System.out.println(printQuitPage());
@@ -313,6 +386,47 @@ public class IPO {
                 System.out.println("> Invalid input, please try again");
                 return true;
         }
+    }
+
+    /**
+     * User is instructed to input a specific Account attribute
+     * @param field The label for which field will be input
+     * @return String
+     */
+    public static String inputValue(String field) {
+        boolean loop = true;
+        while (loop) {
+            switch (field) {
+                case "id":
+                    System.out.print("Account ID: ");
+                    loop = false;
+                    break;
+                case "name":
+                    System.out.println();
+                    System.out.print("Account Name: ");
+                    loop = false;
+                    break;
+                case "type":
+                    System.out.println();
+                    System.out.print("Is this a spending, saving, or investment account? ");
+                    loop = false;
+                    break;
+                case "balance":
+                    System.out.println();
+                    System.out.print("Current Balance: ");
+                    loop = false;
+                    break;
+                case "attribute":
+                    System.out.println();
+                    System.out.print("Enter the name, type, or balance of the account: ");
+                    loop = false;
+                    break;
+                default:
+                    System.out.println();
+                    System.out.println("Not a valid field, try again");
+            }
+        }
+        return sc.nextLine();
     }
 
     // Validation Methods
@@ -347,6 +461,92 @@ public class IPO {
     }
 
     /**
+     * Returns ID value that has been validated
+     * completely
+     * @param id String to be checked
+     * @return integer
+     */
+    public static int getValidId(String id) {
+        while (true) {
+            if (validateId(id)) {
+                if (checkIdExists(id)) {
+                    break;
+                } else {
+                    id = inputValue("id");
+                }
+            } else {
+                id = inputValue("id");
+            }
+        }
+        return Integer.parseInt(id);
+    }
+
+    /**
+     * Check that ID entered is a valid integer
+     * @param id integer to be validated
+     * @return boolean
+     */
+    public static boolean validateId(String id) {
+        // Check that it's integer
+        try {
+            int intId = Integer.parseInt(id);
+            if (intId > 0) {
+                return true;
+            } else {
+                System.out.println("> Please enter a positive integer");
+                return false;
+            }
+        } catch (NumberFormatException e) {
+            System.out.println("> Please enter an integer");
+            return false;
+        }
+    }
+
+    /**
+     * Confirms ID exists in table
+     * @param id Integer to be checked
+     * @return boolean
+     */
+    public static boolean checkIdExists(String id) {
+        int intId = Integer.parseInt(id);
+        int tableId;
+        int tableSize = getTableSize();
+        if (tableSize > 0) {
+            ArrayList<String> ids = queryDB("SELECT id FROM accounts");
+            for (int i = 0; i < tableSize; i++) {
+                tableId = Integer.parseInt(ids.get(i));
+                if (tableId == intId) {
+                    return true;
+                }
+            }
+        }
+        System.out.println("> This ID does not exist, try again");
+        return false;
+    }
+
+    /**
+     * Returns name value that has been validated
+     * completely and is ready to be added as a record
+     * @param name String to be validated
+     * @return valid String
+     */
+    public static String getValidName(String name) {
+        while (true) {
+            if (validateName(name)) {
+                if (checkDuplicateNames(name)) {
+                    break;
+                } else {
+                    name = inputValue("name");
+                }
+            } else {
+                name = inputValue("name");
+            }
+        }
+
+        return name;
+    }
+
+    /**
      * Confirms that name is not too short or too long
      * @param name string to be validated
      * @return boolean
@@ -368,36 +568,128 @@ public class IPO {
      * @return boolean
      */
     public static boolean checkDuplicateNames(String name) {
-        /*String listName = "";
-        int tableSize = list.getListSize(); // SELECT COUNT(*)
-        if (listSize > 0) {
-            for (int i = 0; i < listSize; i++) {
-                listName = list.getCharacter(i).getName();
-                if (listName.equals(name)) {
+        String tableName = "";
+        int tableSize = getTableSize();
+        if (tableSize > 0) {
+            ArrayList<String> result = queryDB("SELECT name FROM accounts");
+            for (int i = 0; i < tableSize; i++) {
+                tableName = result.get(i);
+                if (tableName.equals(name)) {
                     System.out.println("> The name, " + name + ", already exists, please enter a new one");
                     return false;
                 }
             }
-        }*/
+        }
         return true;
     }
 
-    public static boolean setValuesInTable() {
-        String query = "INSERT INTO accounts (name, type, balance) " +
-                "VALUES " +
-                "('groceries', 'spending', 100.25)," +
-                "('Spain trip', 'saving', 583.12)," +
-                "('eat out', 'spending', 75);";
-        if (updateDB(query)) {
-            return true;
-        } else {
+    /**
+     * Returns account type value that has been validated
+     * completely and is ready to be added as a record
+     * @param acctType String to be validated
+     * @return valid String
+     */
+    public static String getValidAcctType(String acctType) {
+        while (true) {
+            if (validateAcctType(acctType)) {
+                break;
+            } else {
+                acctType = inputValue("type");
+            }
+        }
+        return acctType;
+    }
+
+    /**
+     * Confirms that account type is one of the valid options
+     * @param acctType string to be validated
+     * @return boolean
+     */
+    public static boolean validateAcctType(String acctType) {
+        switch (acctType) {
+            case "spending":
+                return true;
+            case "saving":
+                return true;
+            case "investment":
+                return true;
+            default:
+                System.out.println("> Invalid account type, please try again");
+                return false;
+        }
+    }
+
+    /**
+     * Returns balance value that has been validated
+     * completely and is ready to be added as a record
+     * @param balance String to be validated
+     * @return valid Double
+     */
+    public static double getValidBalance(String balance) {
+        while (true) {
+            if (validateBalance(balance)) {
+                break;
+            } else {
+                balance = inputValue("balance");
+            }
+        }
+        return Double.parseDouble(balance);
+    }
+
+    /**
+     * Confirms balance is a valid double
+     * @param balance string to be validated as double
+     * @return boolean
+     */
+    public static boolean validateBalance(String balance) {
+        try {
+            double doubleBalance = Double.parseDouble(balance);
+            if (doubleBalance > 0) {
+                return true;
+            } else {
+                System.out.println("> Please enter a valid balance");
+                return false;
+            }
+        } catch (NumberFormatException e) {
+            System.out.println("> Please enter a valid number with two decimal places");
             return false;
         }
     }
-    public static String getValueFromTable() {
-        String query = "SELECT * FROM accounts";
-        String result = queryDB(query);
-        return result;
+
+    /**
+     * Returns attribute value that has been validated
+     * completely and is ready to be added as a record
+     * @param attribute String to be validated
+     * @return valid String
+     */
+    public static String getValidAttribute(String attribute) {
+        while (true) {
+            if (validateAttribute(attribute)) {
+                break;
+            } else {
+                attribute = inputValue("attribute");
+            }
+        }
+        return attribute;
     }
 
+    /**
+     * Confirms that attribute is one of the valid options
+     * @param attribute String to be validated
+     * @return boolean
+     */
+    public static boolean validateAttribute(String attribute) {
+        switch (attribute) {
+            case "name":
+                return true;
+            case "type":
+                return true;
+            case "balance":
+                return true;
+            default:
+                System.out.print("> Please enter a valid field");
+                return false;
+
+        }
+    }
 }
