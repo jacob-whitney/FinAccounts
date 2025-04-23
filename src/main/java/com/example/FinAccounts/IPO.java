@@ -22,6 +22,7 @@ public class IPO {
     private static String un;
     private static String pw;
     private static String db = "finaccts";
+    private static boolean connected = false;
 
     // Processor Methods
     /**
@@ -63,9 +64,8 @@ public class IPO {
     /**
      * Instructions and user input to connect to
      * the user's database
-     * @return boolean
      */
-    public static boolean connectNewDatabase() {
+    public static void connectNewDatabase() {
         // Get database credentials from user
         System.out.print("Enter your database server's IP address: ");
         ip = sc.nextLine();
@@ -87,15 +87,12 @@ public class IPO {
                                     balance DOUBLE
                                 );""";
                 if (updateDB(query)) {
-                    return true;
+                    connected = true;
                 } else {
-                    return false;
                 }
             } else {
-                return false;
             }
         } else {
-            return false;
         }
     }
 
@@ -148,16 +145,15 @@ public class IPO {
 
     /**
      * Process for creating account from user inputs
-     * @return boolean
      */
-    public static boolean createAccount() {
+    public static void createAccount() {
         String name = getValidName(inputValue("name"));
         String type = getValidAcctType(inputValue("type"));
         double balance = getValidBalance(inputValue("balance"));
 
         String query = "INSERT INTO accounts (name, type, balance) " +
                 "VALUES ('" + name + "', '" + type + "', " + balance + ")";
-        return updateDB(query);
+        updateDB(query);
     }
 
     /**
@@ -196,9 +192,8 @@ public class IPO {
 
     /**
      * Make changes to existing account record in database
-     * @return boolean
      */
-    public static boolean updateAccount() {
+    public static void updateAccount() {
         System.out.println(readAccountsTable());
         System.out.println("Enter the id of the account you would like to update.");
         String id = String.valueOf(getValidId(inputValue("id")));
@@ -219,26 +214,23 @@ public class IPO {
                 break;
             default:
                 System.out.println("> Account could not be updated, try again.");
-                return false;
+                return;
         }
 
         String query = "UPDATE accounts SET " + attribute + " = '" + value + "' WHERE id = " + id + ";";
         updateDB(query);
-        return true;
     }
 
     /**
      * Delete account by id
-     * @return boolean
      */
-    public static boolean deleteAccount() {
+    public static void deleteAccount() {
         System.out.println(readAccountsTable());
         System.out.println("Enter the id of the account you would like to delete.");
         String id = String.valueOf(getValidId(inputValue("id")));
 
         String query = "DELETE FROM accounts WHERE id = " + id + ";";
         updateDB(query);
-        return true;
     }
 
     // Print Methods
@@ -272,14 +264,20 @@ public class IPO {
         String menu = "\n\n" +
                 printHorizontalRule() +
                 "\s** MENU **\n" +
-                printHorizontalRule() +
-                "c - Create an account\n" +
-                "p - Print all accounts' details\n" +
-                "u - Update an account\n" +
-                "d - Delete an account\n" +
-                "q - Quit\n" +
-                printHorizontalRule() +
-                "\nEnter the letter of the option you want to use: ";
+                printHorizontalRule();
+        if (connected) {
+            menu += "DB status: CONNECTED\n\n";
+        } else {
+            menu += "DB status: DISCONNECTED\n\n" +
+            "n = New database connection\n";
+        }
+        menu += "c - Create an account\n" +
+            "p - Print all accounts' details\n" +
+            "u - Update an account\n" +
+            "d - Delete an account\n" +
+            "q - Quit\n" +
+            printHorizontalRule() +
+            "\nEnter the letter of the option you want to use: ";
 
         return menu;
     }
@@ -360,10 +358,16 @@ public class IPO {
     }
 
     // User Input Methods
+    /**
+     * Switch case for user to interact with menu
+     * @return boolean
+     */
     public static boolean getMainMenuSwitch() {
         String input = sc.nextLine();
 
         switch (input) {
+            case "n":
+                connectNewDatabase();
             case "c":
                 System.out.println(printCreatePage());
                 createAccount();
